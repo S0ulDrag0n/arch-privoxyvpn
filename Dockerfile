@@ -1,6 +1,12 @@
 FROM binhex/arch-int-vpn:latest
-LABEL org.opencontainers.image.authors = "binhex"
-LABEL org.opencontainers.image.source = "https://github.com/binhex/arch-privoxyvpn"
+LABEL org.opencontainers.image.authors="binhex"
+LABEL org.opencontainers.image.source="https://github.com/binhex/arch-privoxyvpn"
+
+# release tag name from buildx arg
+ARG RELEASETAG
+
+# arch from buildx --platform, e.g. amd64
+ARG TARGETARCH
 
 # additional files
 ##################
@@ -11,9 +17,6 @@ ADD build/*.conf /etc/supervisor/conf.d/
 # add bash scripts to install app
 ADD build/root/*.sh /root/
 
-# get release tag name from build arg
-ARG release_tag_name
-
 # add run bash scripts
 ADD run/nobody/*.sh /home/nobody/
 
@@ -22,13 +25,7 @@ ADD run/nobody/*.sh /home/nobody/
 
 # make executable and run bash scripts to install app
 RUN chmod +x /root/*.sh /home/nobody/*.sh && \
-	/bin/bash /root/install.sh "${release_tag_name}"
-
-# docker settings
-#################
-
-# expose port for privoxy
-EXPOSE 8118
+	/bin/bash /root/install.sh "${RELEASETAG}" "${TARGETARCH}"
 
 # set permissions
 #################

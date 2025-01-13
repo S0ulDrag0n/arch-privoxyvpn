@@ -3,32 +3,33 @@
 # exit script if return code != 0
 set -e
 
-# release tag name from build arg, stripped of build ver using string manipulation
-release_tag_name="${1//-[0-9][0-9]/}"
+# release tag name from buildx arg, stripped of build ver using string manipulation
+RELEASETAG="${1}"
+
+# target arch from buildx arg
+TARGETARCH="${2}"
+
+if [[ -z "${RELEASETAG}" ]]; then
+	echo "[warn] Release tag name from build arg is empty, exiting script..."
+	exit 1
+fi
+
+if [[ -z "${TARGETARCH}" ]]; then
+	echo "[warn] Target architecture name from build arg is empty, exiting script..."
+	exit 1
+fi
+
+# write RELEASETAG to file to record the release tag used to build the image
+echo "IMAGE_RELEASE_TAG=${RELEASETAG}" >> '/etc/image-release'
 
 # note do NOT download build scripts - inherited from int script with envvars common defined
 
-# detect image arch
-####
-
-OS_ARCH=$(cat /etc/os-release | grep -P -o -m 1 "(?=^ID\=).*" | grep -P -o -m 1 "[a-z]+$")
-if [[ ! -z "${OS_ARCH}" ]]; then
-	if [[ "${OS_ARCH}" == "arch" ]]; then
-		OS_ARCH="x86-64"
-	else
-		OS_ARCH="aarch64"
-	fi
-	echo "[info] OS_ARCH defined as '${OS_ARCH}'"
-else
-	echo "[warn] Unable to identify OS_ARCH, defaulting to 'x86-64'"
-	OS_ARCH="x86-64"
-fi
 
 # pacman packages
 ####
 
 # define pacman packages
-pacman_packages="base-devel privoxy"
+pacman_packages=""
 
 # install compiled packages using pacman
 if [[ ! -z "${pacman_packages}" ]]; then
@@ -43,12 +44,6 @@ aur_packages=""
 
 # call aur install script (arch user repo)
 source aur.sh
-
-# github release - microsocks
-####
-
-# download and compile microsocks
-github.sh --install-path "/tmp/compile" --github-owner "rofl0r" --github-repo "microsocks" --compile-src 'make install'
 
 # container perms
 ####
@@ -109,48 +104,7 @@ rm /tmp/permissions_heredoc
 ####
 
 cat <<'EOF' > /tmp/envvars_heredoc
-
-export ENABLE_SOCKS=$(echo "${ENABLE_SOCKS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${ENABLE_SOCKS}" ]]; then
-	echo "[info] ENABLE_SOCKS defined as '${ENABLE_SOCKS}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[warn] ENABLE_SOCKS not defined (via -e ENABLE_SOCKS), defaulting to 'no'" | ts '%Y-%m-%d %H:%M:%.S'
-	export ENABLE_SOCKS="no"
-fi
-
-export ENABLE_PRIVOXY=$(echo "${ENABLE_PRIVOXY}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-if [[ ! -z "${ENABLE_PRIVOXY}" ]]; then
-	echo "[info] ENABLE_PRIVOXY defined as '${ENABLE_PRIVOXY}'" | ts '%Y-%m-%d %H:%M:%.S'
-else
-	echo "[warn] ENABLE_PRIVOXY not defined (via -e ENABLE_PRIVOXY), defaulting to 'no'" | ts '%Y-%m-%d %H:%M:%.S'
-	export ENABLE_PRIVOXY="no"
-fi
-
-if [[ "${ENABLE_SOCKS}" == "yes" ]]; then
-
-	export SOCKS_USER=$(echo "${SOCKS_USER}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-	if [[ ! -z "${SOCKS_USER}" ]]; then
-		echo "[info] SOCKS_USER defined as '${SOCKS_USER}'" | ts '%Y-%m-%d %H:%M:%.S'
-	else
-		echo "[warn] SOCKS_USER not defined (via -e SOCKS_USER), disabling authentication for microsocks" | ts '%Y-%m-%d %H:%M:%.S'
-		export SOCKS_USER=""
-	fi
-
-	if [[ -n "${SOCKS_USER}" ]]; then
-
-		export SOCKS_PASS=$(echo "${SOCKS_PASS}" | sed -e 's~^[ \t]*~~;s~[ \t]*$~~')
-		if [[ ! -z "${SOCKS_PASS}" ]]; then
-			echo "[info] SOCKS_PASS defined as '${SOCKS_PASS}'" | ts '%Y-%m-%d %H:%M:%.S'
-		else
-			echo "[warn] SOCKS_PASS not defined (via -e SOCKS_PASS), defaulting to 'socks'" | ts '%Y-%m-%d %H:%M:%.S'
-			export SOCKS_PASS="socks"
-		fi
-
-	fi
-fi
-
 export APPLICATION="privoxy"
-
 EOF
 
 # replace env vars placeholder string with contents of file (here doc)
